@@ -1,6 +1,6 @@
 ---
 name: find-youtube-inspo
-description: Search and curate the local Creative Agent YouTube library for title and thumbnail inspiration. Use for creative briefs, title iteration, thumbnail directions, reference images or videos, conversational exploration, and selecting diverse examples.
+description: Search, curate, and visually review the local Creative Agent YouTube library for title and thumbnail inspiration. Use for creative briefs, title iteration, thumbnail directions, reference images or videos, conversational exploration, selecting diverse examples, and showing a working selection as an inline thumbnail grid.
 ---
 
 # Find YouTube inspiration
@@ -15,6 +15,7 @@ Use `creative-agent` search primitives as building blocks. Let the conversation 
 4. For a reference video already in the library, use its stored title, thumbnail, and description. For an external YouTube reference, use `oytc` when available; ask before installing it and apply the import skill's authentication and secret-handling boundaries if setup is required.
 5. Combine and rerank results with agent judgment. Favor relevance while retaining useful variation in channels, visual approaches, title formulas, and popularity.
 6. Review metadata and stored descriptions broadly, then visually inspect only a manageable shortlist of promising local thumbnails. Do not load the entire candidate set as images by default.
-7. Return concise recommendations with reasoning and useful metadata. Maintain the working selection in the current task; do not persist it unless the user later asks for a board workflow.
+7. Return concise recommendations with reasoning and useful metadata. If the user asks to see the thumbnails together, read [references/inline-thumbnail-grid.md](references/inline-thumbnail-grid.md) completely and render the working shortlist as an inline review grid.
+8. Maintain the working selection in the current task. Do not persist an inline grid; use `create-inspo-page` when the user asks for a saved, editable, or published inspiration board.
 
 Use absolute thumbnail paths from CLI results. Keep search iterative and adapt subsequent queries to the user's feedback rather than following a fixed sequence.
