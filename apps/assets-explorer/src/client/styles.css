@@ -429,6 +429,18 @@ main {
   text-transform: uppercase;
 }
 
+.load-sentinel__retry {
+  border: 1px solid #25251f;
+  padding: 8px 13px;
+  background: #25251f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .status-panel {
   display: grid;
   min-height: 52vh;

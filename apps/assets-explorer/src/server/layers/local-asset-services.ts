@@ -215,11 +215,11 @@ export const LocalAssetCatalog = Layer.effect(
 
     const listAssets = (request: ListAssetsRequest) =>
       Effect.gen(function* () {
-        const initialCursor = request.cursor
-          ? yield* decodeCursor(request.cursor, request)
-          : undefined
+        const initialCursor =
+          request.cursor !== undefined ? yield* decodeCursor(request.cursor, request) : undefined
         const seed = initialCursor?.seed ?? Math.floor(Math.random() * 1_000_000) + 1
-        const countParams = request.creatorId ? [request.creatorId] : []
+        const creatorParams = request.creatorId !== undefined ? [request.creatorId] : []
+        const creatorFilter = creatorParams.length > 0
         const countRows = yield* sql
           .unsafe<CountRow>(
             `SELECT COUNT(*) AS total
@@ -227,8 +227,8 @@ export const LocalAssetCatalog = Layer.effect(
           INNER JOIN channels AS c ON c.id = v.channel_id
           WHERE v.thumbnail_path <> ''
             AND c.avatar_path IS NOT NULL
-            ${request.creatorId ? "AND v.channel_id = ?" : ""}`,
-            countParams,
+            ${creatorFilter ? "AND v.channel_id = ?" : ""}`,
+            creatorParams,
           )
           .pipe(
             Effect.mapError(
@@ -243,12 +243,7 @@ export const LocalAssetCatalog = Layer.effect(
 
         while (assets.length <= request.limit && !exhausted) {
           const parts = sortParts(request.sort, cursor, seed)
-          const params = [
-            ...parts.selectParams,
-            ...(request.creatorId ? [request.creatorId] : []),
-            ...parts.whereParams,
-            batchSize,
-          ]
+          const params = [...parts.selectParams, ...creatorParams, ...parts.whereParams, batchSize]
           const rows = yield* sql
             .unsafe<AssetRow>(
               `SELECT
@@ -266,7 +261,7 @@ export const LocalAssetCatalog = Layer.effect(
             INNER JOIN channels AS c ON c.id = v.channel_id
             WHERE v.thumbnail_path <> ''
               AND c.avatar_path IS NOT NULL
-              ${request.creatorId ? "AND v.channel_id = ?" : ""}
+              ${creatorFilter ? "AND v.channel_id = ?" : ""}
               ${parts.where}
             ORDER BY ${parts.order}
             LIMIT ?`,

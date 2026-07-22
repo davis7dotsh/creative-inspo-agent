@@ -13,6 +13,11 @@ const CursorPayload = Schema.Struct({
 
 export type CursorPayload = typeof CursorPayload.Type
 
+const valueMatchesSort = (cursor: CursorPayload) =>
+  cursor.sort === "newest" || cursor.sort === "oldest"
+    ? typeof cursor.value === "string"
+    : typeof cursor.value === "number"
+
 const decodePayload = Schema.decodeUnknownEffect(CursorPayload)
 
 export const encodeCursor = (cursor: CursorPayload) =>
@@ -36,5 +41,9 @@ export const decodeCursor = (
     Effect.filterOrFail(
       (cursor) => cursor.sort !== "random" || cursor.seed !== undefined,
       () => new InvalidCursorError({ message: "The random cursor is missing its seed." }),
+    ),
+    Effect.filterOrFail(
+      valueMatchesSort,
+      () => new InvalidCursorError({ message: "The cursor value does not match its sort order." }),
     ),
   )

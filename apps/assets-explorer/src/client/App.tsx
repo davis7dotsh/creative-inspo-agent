@@ -157,6 +157,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false)
   const [headerVisible, setHeaderVisible] = useState(true)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const generationRef = useRef(0)
@@ -189,6 +190,7 @@ export default function App() {
     loadingMoreRef.current = false
     setLoadingMore(false)
     setError(false)
+    setLoadMoreFailed(false)
     setAssets([])
     setNextCursor(undefined)
 
@@ -222,6 +224,7 @@ export default function App() {
     const generation = generationRef.current
     loadingMoreRef.current = true
     setLoadingMore(true)
+    setLoadMoreFailed(false)
 
     fetchAssets({ ...(creatorId ? { creatorId } : {}), sort, cursor: nextCursor })
       .then(
@@ -232,7 +235,7 @@ export default function App() {
           setTotal(page.total)
         },
         () => {
-          if (generation === generationRef.current) setError(true)
+          if (generation === generationRef.current) setLoadMoreFailed(true)
         },
       )
       .finally(() => {
@@ -367,6 +370,11 @@ export default function App() {
         ) : null}
         <div className="load-sentinel" ref={sentinelRef}>
           {loadingMore ? <span>Loading more assets…</span> : null}
+          {loadMoreFailed && !loadingMore ? (
+            <button type="button" className="load-sentinel__retry" onClick={loadMore}>
+              Loading more failed — try again
+            </button>
+          ) : null}
           {!nextCursor && assets.length > 0 ? <span>End of corpus</span> : null}
         </div>
       </main>

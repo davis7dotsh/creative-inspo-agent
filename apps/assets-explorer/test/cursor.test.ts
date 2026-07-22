@@ -46,4 +46,31 @@ describe("asset cursors", () => {
 
     expect(result._tag).toBe("Failure")
   })
+
+  it("rejects cursors whose value type does not match the sort order", async () => {
+    const numericNewest = encodeCursor({
+      version: 1,
+      sort: "newest",
+      creatorId: null,
+      value: 42,
+      id: "video-1",
+    })
+    const stringMostViewed = encodeCursor({
+      version: 1,
+      sort: "mostViewed",
+      creatorId: null,
+      value: "1000",
+      id: "video-1",
+    })
+
+    const newestResult = await Effect.runPromiseExit(
+      decodeCursor(numericNewest, { sort: "newest" }),
+    )
+    const mostViewedResult = await Effect.runPromiseExit(
+      decodeCursor(stringMostViewed, { sort: "mostViewed" }),
+    )
+
+    expect(newestResult._tag).toBe("Failure")
+    expect(mostViewedResult._tag).toBe("Failure")
+  })
 })

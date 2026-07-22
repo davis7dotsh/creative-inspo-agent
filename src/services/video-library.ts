@@ -728,11 +728,21 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
         return { total: 0, inserted: 0, updated: 0 }
       }
 
+      const enrichedChannelIds = new Set(preparedChannels.map(({ channel }) => channel.id))
       const authoritativeChannelTitles = new Map(
-        prepared.map(({ video }) => [video.channelId, video.channelTitle] as const),
+        preparedChannels.map(({ channel }) => [channel.id, channel.title] as const),
       )
-      for (const { channel } of preparedChannels) {
-        authoritativeChannelTitles.set(channel.id, channel.title)
+      for (const { video } of prepared) {
+        if (enrichedChannelIds.has(video.channelId)) {
+          continue
+        }
+        const existingTitle = authoritativeChannelTitles.get(video.channelId)
+        if (existingTitle !== undefined && existingTitle !== video.channelTitle) {
+          return yield* validationFailure(
+            `videos for channel ${video.channelId} disagree on the channel title`,
+          )
+        }
+        authoritativeChannelTitles.set(video.channelId, video.channelTitle)
       }
 
       const persist = withThumbnailMutationLock(
@@ -743,7 +753,6 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
 
           yield* persistPreparedChannels(preparedChannels, now)
 
-          const enrichedChannelIds = new Set(preparedChannels.map(({ channel }) => channel.id))
           for (const [id, title] of authoritativeChannelTitles) {
             if (enrichedChannelIds.has(id)) {
               continue

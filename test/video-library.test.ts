@@ -433,6 +433,31 @@ describe("VideoLibrary", () => {
     expect(result.search.map(({ video }) => video.id).sort()).toEqual(["legacy-one", "legacy-two"])
   })
 
+  it("rejects a batch whose videos disagree on one channel's title", async () => {
+    const result = await runWithLibrary(false, (root) =>
+      Effect.gen(function* () {
+        const library = yield* VideoLibrary
+        const videos = yield* Effect.all([
+          stageVideo(root, {
+            id: "first-title",
+            channelId: "contested",
+            channelTitle: "Name A",
+          }),
+          stageVideo(root, {
+            id: "second-title",
+            channelId: "contested",
+            channelTitle: "Name B",
+          }),
+        ])
+        const error = yield* library.upsertPreparedBatch({ videos }).pipe(Effect.flip)
+        return { error, videos: yield* library.list() }
+      }),
+    )
+
+    expect(result.error).toBeInstanceOf(ValidationError)
+    expect(result.videos).toEqual([])
+  })
+
   it("rejects duplicate channel ids before storing an avatar", async () => {
     const result = await runWithLibrary(false, (root) =>
       Effect.gen(function* () {

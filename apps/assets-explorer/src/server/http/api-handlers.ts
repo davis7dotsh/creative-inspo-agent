@@ -16,10 +16,10 @@ export const ExplorerApiHandlers = HttpApiBuilder.group(
       .handle("listAssets", ({ query }) =>
         catalog
           .listAssets({
-            ...(query.creatorId ? { creatorId: query.creatorId } : {}),
+            ...(query.creatorId !== undefined ? { creatorId: query.creatorId } : {}),
             sort: query.sort ?? "random",
             limit: query.limit ?? 72,
-            ...(query.cursor ? { cursor: query.cursor } : {}),
+            ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
           })
           .pipe(
             Effect.catchTags({
