@@ -1,5 +1,7 @@
 import { Schema } from "effect"
 
+export const minimumVideoDurationSeconds = 180
+
 export const ThumbnailVariant = Schema.Struct({
   url: Schema.String,
   width: Schema.optionalKey(Schema.Finite),
@@ -23,7 +25,7 @@ export const PreparedVideo = Schema.Struct({
   channelId: Schema.String,
   channelTitle: Schema.String,
   publishedAt: Schema.String,
-  durationSeconds: Schema.Finite,
+  durationSeconds: Schema.Int.check(Schema.isGreaterThanOrEqualTo(minimumVideoDurationSeconds)),
   thumbnails: Schema.Array(ThumbnailVariant),
   localThumbnailPath: Schema.String,
   statistics: VideoStatistics,

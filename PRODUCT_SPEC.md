@@ -100,6 +100,7 @@ All user state is created automatically beneath `~/.creative-inspo-agent/`:
 - SQLite stores structured video metadata and local vectors.
 - A local SQLite vector extension provides similarity search.
 - Only the best thumbnail is downloaded; all source thumbnail URLs remain in SQLite.
+- Videos under 180 seconds are treated as Shorts and excluded before thumbnail download, description, embedding, or persistence. Videos exactly 180 seconds long remain eligible.
 - Staging keeps incomplete imports invisible. A failed batch leaves no visible database records.
 
 The future hosted architecture will keep the same high-level capability contracts while implementing metadata in D1, blobs in R2, and vectors in Vectorize.
@@ -201,7 +202,7 @@ V1 is complete when:
 1. A fresh machine can install the project and run `creative-agent`.
 2. The CLI automatically creates safe local state beneath `~/.creative-inspo-agent/`.
 3. OpenAI login, logout, and status behave safely without revealing the key.
-4. A prepared multi-video JSON batch can be embedded and atomically imported into SQLite.
+4. A prepared multi-video JSON batch containing only videos of at least 180 seconds can be embedded and atomically imported into SQLite; shorter videos are rejected by the CLI backstop.
 5. Repeat imports update records without duplication.
 6. Videos can be searched through title semantics, thumbnail-description semantics, keywords, and supported filters.
 7. Videos can be listed, inspected, deleted, and reindexed.

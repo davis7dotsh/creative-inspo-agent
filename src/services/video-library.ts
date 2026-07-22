@@ -6,6 +6,7 @@ import { SqlClient, type Statement } from "effect/unstable/sql"
 import { NotFoundError, StorageError, ValidationError } from "../domain/errors.js"
 import {
   type Embedding,
+  minimumVideoDurationSeconds,
   type PreparedVideo,
   type PreparedVideoBatch,
   ThumbnailVariant,
@@ -443,6 +444,11 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
           }
         }
         yield* validateNonNegativeInteger(video.durationSeconds, "durationSeconds")
+        if (video.durationSeconds < minimumVideoDurationSeconds) {
+          return yield* validationFailure(
+            `video ${video.id} is under the ${minimumVideoDurationSeconds}-second minimum duration`,
+          )
+        }
         const publishedEpoch = Date.parse(video.publishedAt)
         if (!Number.isFinite(publishedEpoch)) {
           return yield* validationFailure(`publishedAt for ${video.id} is invalid`)

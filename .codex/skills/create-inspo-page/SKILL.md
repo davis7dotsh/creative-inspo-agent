@@ -12,8 +12,10 @@ the user's brief.
 ## Workflow
 
 1. Confirm the working selection, board name, and any creative direction already established in
-   the conversation. Resolve missing video metadata or local assets with `creative-agent` search
-   primitives when needed; inspect command help and schemas rather than guessing contracts.
+   the conversation. Keep only videos with a verified duration of at least 180 seconds; treat
+   shorter videos as Shorts and exclude them from the board. Resolve missing video metadata or
+   local assets with `creative-agent` search primitives using `minDurationSeconds: 180` when
+   needed; inspect command help and schemas rather than guessing contracts.
 2. Read `INSPO_PAGE_SPEC.md` and `templates/inspo-page/README.md` from the repository root. Treat
    `templates/inspo-page/` as an example and starting point, not a shared renderer or rigid schema.
 3. Create a unique directory under `~/.creative-inspo-agent/boards/<name>/` and copy the template

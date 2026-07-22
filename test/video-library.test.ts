@@ -47,7 +47,7 @@ const stageVideo = (root: string, options: VideoFixtureOptions) =>
       channelId: options.channelId ?? "channel-1",
       channelTitle: options.channelTitle ?? "Channel One",
       publishedAt: options.publishedAt ?? "2026-01-01T00:00:00.000Z",
-      durationSeconds: options.durationSeconds ?? 120,
+      durationSeconds: options.durationSeconds ?? 240,
       thumbnails: [
         {
           url: `https://example.com/${options.id}.jpg`,
@@ -137,7 +137,7 @@ describe("VideoLibrary", () => {
             id: "same",
             channelId: "wanted",
             channelTitle: "Wanted",
-            durationSeconds: 90,
+            durationSeconds: 240,
             viewCount: "5000",
             titleVector: axisVector(0),
             thumbnailVector: axisVector(1),
@@ -179,7 +179,7 @@ describe("VideoLibrary", () => {
           model: "text-embedding-3-large",
           filters: {
             channel: "wanted",
-            maxDurationSeconds: 100,
+            maxDurationSeconds: 250,
             minViewCount: 1000,
           },
         })
@@ -349,6 +349,32 @@ describe("VideoLibrary", () => {
 
     expect(result.error).toBeInstanceOf(ValidationError)
     expect(result.count).toBe(0)
+  })
+
+  it("rejects an under-180-second batch before promoting thumbnail assets", async () => {
+    const result = await runWithLibrary(false, (root) =>
+      Effect.gen(function* () {
+        const library = yield* VideoLibrary
+        const eligible = yield* stageVideo(root, { id: "eligible", durationSeconds: 180 })
+        const short = yield* stageVideo(root, { id: "short", durationSeconds: 179 })
+        const error = yield* library
+          .upsertPreparedBatch({ videos: [eligible, short] })
+          .pipe(Effect.flip)
+
+        return {
+          error,
+          stored: yield* library.list(),
+          thumbnails: readdirSync(`${root}/assets/thumbnails`),
+        }
+      }),
+    )
+
+    expect(result.error).toBeInstanceOf(ValidationError)
+    expect(result.error).toMatchObject({
+      message: "video short is under the 180-second minimum duration",
+    })
+    expect(result.stored).toEqual([])
+    expect(result.thumbnails).toEqual([])
   })
 
   it("deletes videos and can atomically replace embeddings for reindexing", async () => {
