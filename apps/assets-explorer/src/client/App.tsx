@@ -101,6 +101,7 @@ function AssetCard({
   readonly onBroken: (id: string) => void
 }) {
   const [loaded, setLoaded] = useState(false)
+  const [avatarFailed, setAvatarFailed] = useState(false)
 
   return (
     <a
@@ -122,7 +123,9 @@ function AssetCard({
       <span className="asset-card__duration">{formatDuration(asset.durationSeconds)}</span>
       <span className="asset-card__overlay" aria-hidden="true">
         <span className="asset-card__eyebrow">
-          <img src={asset.creatorAvatarUrl} alt="" />
+          {avatarFailed ? null : (
+            <img src={asset.creatorAvatarUrl} alt="" onError={() => setAvatarFailed(true)} />
+          )}
           <span className="asset-card__creator-name">{asset.creatorTitle}</span>
         </span>
         <span className="asset-card__title">{asset.title}</span>

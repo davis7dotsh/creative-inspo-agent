@@ -1,10 +1,10 @@
 import { Effect, Schema } from "effect"
-import type { SortOrder } from "../../contracts/api.js"
+import { SortOrder } from "../../contracts/api.js"
 import { InvalidCursorError } from "./errors.js"
 
 const CursorPayload = Schema.Struct({
   version: Schema.Literal(1),
-  sort: Schema.Literals(["random", "newest", "oldest", "mostViewed"]),
+  sort: SortOrder,
   creatorId: Schema.NullOr(Schema.String),
   value: Schema.Union([Schema.String, Schema.Finite]),
   id: Schema.String,

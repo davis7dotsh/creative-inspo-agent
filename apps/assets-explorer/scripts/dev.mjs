@@ -8,9 +8,10 @@ const children = [
 let stopping = false
 
 const stop = (signal) => {
-  if (stopping) return
+  if (stopping) return false
   stopping = true
   for (const child of children) child.kill(signal)
+  return true
 }
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
@@ -19,7 +20,8 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 for (const child of children) {
   child.on("exit", (code, signal) => {
-    stop("SIGTERM")
+    const initiated = stop("SIGTERM")
+    if (!initiated) return
     if (signal) process.kill(process.pid, signal)
     process.exitCode = code ?? 1
   })

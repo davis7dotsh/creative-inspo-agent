@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { NodeServices } from "@effect/platform-node"
 import { SqliteClient } from "@effect/sql-sqlite-node"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Stream } from "effect"
 import { afterEach, describe, expect, it } from "vitest"
 import { LocalAssetCatalog, LocalAssetMedia } from "../src/server/layers/local-asset-services.js"
 import { AssetCatalog } from "../src/server/services/asset-catalog.js"
@@ -140,13 +140,16 @@ describe("local asset services", () => {
       Effect.gen(function* () {
         const media = yield* AssetMedia
         const file = yield* media.getThumbnail("video-1")
+        const chunks = yield* Stream.runCollect(file.body)
+        const body = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8")
         const missing = yield* Effect.flip(media.getThumbnail("unknown"))
-        return { file, missing }
+        return { file, body, missing }
       }).pipe(Effect.provide(ServicesLive)),
     )
 
     expect(result.file.contentType).toBe("image/jpeg")
     expect(result.file.contentLength).toBeGreaterThan(0)
+    expect(result.body).toBe("thumbnail-1")
     expect(result.missing._tag).toBe("MediaNotFoundError")
   })
 })
