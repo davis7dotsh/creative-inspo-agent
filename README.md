@@ -1,6 +1,15 @@
 # Creative Agent
 
-Creative Agent is a local-first CLI and three Codex skills for collecting, searching, and presenting YouTube inspiration.
+Creative Agent is a local-first CLI and four Codex skills for collecting, searching, generating, and presenting YouTube inspiration.
+
+## Skills
+
+- `import-youtube-inspo` imports public videos, channels, and playlists into the local library.
+- `find-youtube-inspo` searches and curates title and thumbnail references.
+- `generate-inspo` remixes a curated selection into original title and thumbnail concepts.
+- `create-inspo-page` turns a working selection into a standalone visual board that can be previewed or published.
+
+For a complete agent-led installation and user onboarding workflow, see [SETUP.md](SETUP.md).
 
 ## Run from a checkout
 

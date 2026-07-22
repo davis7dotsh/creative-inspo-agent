@@ -83,7 +83,7 @@ const preparedVideoInput = (root: string, id: string, thumbnail = `thumbnail:${i
     channelId: "channel-id",
     channelTitle: "Channel",
     publishedAt: "2026-01-01T00:00:00.000Z",
-    durationSeconds: 120,
+    durationSeconds: 240,
     thumbnails: [{ url: `https://example.com/${id}.jpg` }],
     localThumbnailPath,
     statistics: { viewCount: "1000" },
@@ -114,7 +114,7 @@ const storedVideo = (id: string): StoredVideo => ({
   channelId: "channel-id",
   channelTitle: "Channel",
   publishedAt: "2026-01-01T00:00:00.000Z",
-  durationSeconds: 120,
+  durationSeconds: 240,
   thumbnails: [{ url: `https://example.com/${id}.jpg` }],
   localThumbnailPath: `/tmp/${id}.jpg`,
   statistics: { viewCount: "1000" },
@@ -297,6 +297,35 @@ describe("CLI process contract", () => {
         localAvatarPath: expect.stringMatching(/assets\/channel-avatars\/[a-f0-9]{64}\.jpg$/),
       },
     ])
+  })
+
+  it("rejects videos under 180 seconds and accepts the exact boundary", () => {
+    const root = mkdtempSync(join(tmpdir(), "creative-agent-cli-"))
+    temporaryRoots.push(root)
+    const short = { ...preparedVideoInput(root, "short"), durationSeconds: 179 }
+    const boundary = { ...preparedVideoInput(root, "boundary"), durationSeconds: 180 }
+
+    const rejected = runCliAtRoot(root, ["videos", "upsert"], JSON.stringify({ videos: [short] }))
+    const accepted = runCliAtRoot(
+      root,
+      ["videos", "upsert"],
+      JSON.stringify({ videos: [boundary] }),
+    )
+    const listed = runCliAtRoot(root, ["videos", "list"])
+
+    expect(rejected.status).toBe(1)
+    expect(JSON.parse(rejected.stderr)).toEqual({
+      ok: false,
+      error: { code: "validation_error", message: "Prepared video batch JSON is invalid" },
+    })
+    expect(accepted.status).toBe(0)
+    expect(JSON.parse(accepted.stdout)).toEqual({
+      ok: true,
+      data: { total: 1, inserted: 1, updated: 0 },
+    })
+    expect(
+      JSON.parse(listed.stdout).data.videos.map(({ id }: { readonly id: string }) => id),
+    ).toEqual(["boundary"])
   })
 
   it("does not partially apply a multi-id delete when one id is missing", () => {

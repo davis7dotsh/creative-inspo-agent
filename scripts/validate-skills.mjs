@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { parseDocument } from "yaml"
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)))
-const skills = ["import-youtube-inspo", "find-youtube-inspo", "create-inspo-page"]
+const skills = ["import-youtube-inspo", "find-youtube-inspo", "generate-inspo", "create-inspo-page"]
 const allowedProperties = new Set(["name", "description", "license", "allowed-tools", "metadata"])
 
 const validateSkill = (skill) => {

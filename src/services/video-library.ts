@@ -8,6 +8,7 @@ import {
   ChannelAvatarVariant,
   type ChannelAvatarVariant as ChannelAvatarVariantValue,
   type Embedding,
+  minimumVideoDurationSeconds,
   type PreparedChannel,
   type PreparedChannelBatch,
   type PreparedVideo,
@@ -555,6 +556,11 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
           }
         }
         yield* validateNonNegativeInteger(video.durationSeconds, "durationSeconds")
+        if (video.durationSeconds < minimumVideoDurationSeconds) {
+          return yield* validationFailure(
+            `video ${video.id} is under the ${minimumVideoDurationSeconds}-second minimum duration`,
+          )
+        }
         const publishedEpoch = Date.parse(video.publishedAt)
         if (!Number.isFinite(publishedEpoch)) {
           return yield* validationFailure(`publishedAt for ${video.id} is invalid`)

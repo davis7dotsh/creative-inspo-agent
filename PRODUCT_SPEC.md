@@ -14,9 +14,10 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 4. Once every item is prepared, the skill submits videos and normalized channels in one JSON batch to `creative-agent` for an atomic database upsert.
 5. In another Codex task, invoke `find-youtube-inspo` with a creative brief, reference image, reference video, title idea, thumbnail direction, or any combination.
 6. The skill uses flexible CLI search primitives, agent judgment, and selective visual review to return concise, diverse recommendations and help iterate on titles and thumbnails.
-7. Invoke `create-inspo-page` with the working selection to create and iterate on an independent React/Vite inspiration wall.
-8. Preview the board locally or publish it through Sites when requested.
-9. Run `pnpm assets:dev` to casually browse the complete live corpus in the local Assets Explorer.
+7. Invoke `generate-inspo` to distill the strongest references into original title-and-thumbnail directions and generate iterative thumbnail assets.
+8. Invoke `create-inspo-page` with the working selection to create and iterate on an independent React/Vite inspiration wall, or append generated concepts to an existing board.
+9. Preview the board locally or publish it through Sites when requested.
+10. Run `pnpm assets:dev` to casually browse the complete live corpus in the local Assets Explorer.
 
 ## V1 scope
 
@@ -32,7 +33,7 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 - Listing, showing, deleting, and reindexing videos.
 - OpenAI API-key login, logout, and status commands.
 - JSON-first command input and output with optional human-readable tables.
-- Repository-local `import-youtube-inspo`, `find-youtube-inspo`, and `create-inspo-page` skills under `.codex/skills/`.
+- Repository-local `import-youtube-inspo`, `find-youtube-inspo`, `generate-inspo`, and `create-inspo-page` skills under `.codex/skills/`.
 - A canonical, self-contained React/Vite inspiration-page template.
 - Independent local boards with optional Sites publishing.
 - A single-user, read-only Assets Explorer for the live local YouTube corpus.
@@ -109,6 +110,7 @@ All user state is created automatically beneath `~/.creative-inspo-agent/`:
 - A local SQLite vector extension provides similarity search.
 - Only the best thumbnail is downloaded; all source thumbnail URLs remain in SQLite.
 - Only the best channel avatar is downloaded; all source avatar URLs remain in SQLite.
+- Videos under 180 seconds are treated as Shorts and excluded before thumbnail download, description, embedding, or persistence. Videos exactly 180 seconds long remain eligible.
 - Staging keeps incomplete imports invisible. A failed batch leaves no visible database records.
 
 The future hosted architecture will keep the same high-level capability contracts while implementing metadata in D1, blobs in R2, and vectors in Vectorize.
@@ -180,6 +182,14 @@ Skills should remain concise and high-freedom. They describe available capabilit
 - Keep a working selection within the Codex task and provide concise recommendations with reasoning.
 - Favor relevance while introducing enough diversity to support inspiration.
 
+### `generate-inspo`
+
+- Start from a meaningful working selection, invoking `find-youtube-inspo` first when discovery is incomplete.
+- Distill roughly three closest title and thumbnail references into transferable creative traits.
+- Develop distinct title-and-thumbnail directions and use image generation for a couple of visual alternatives by default.
+- Iterate non-destructively from user feedback while preserving prior rounds.
+- Append generated concepts to an active inspiration-page project when one exists and validate the updated project.
+
 ### `create-inspo-page`
 
 - Turn the current task's working selection into an independent React/Vite project.
@@ -221,11 +231,11 @@ V1 is complete when:
 1. A fresh machine can install the project and run `creative-agent`.
 2. The CLI automatically creates safe local state beneath `~/.creative-inspo-agent/`.
 3. OpenAI login, logout, and status behave safely without revealing the key.
-4. A prepared multi-video JSON batch can be embedded and atomically imported into SQLite.
+4. A prepared multi-video JSON batch containing only videos of at least 180 seconds can be embedded and atomically imported into SQLite; shorter videos are rejected by the CLI backstop.
 5. Repeat imports update records without duplication.
 6. Videos can be searched through title semantics, thumbnail-description semantics, keywords, and supported filters.
 7. Videos can be listed, inspected, deleted, and reindexed.
 8. JSON output is stable and human-readable output is useful.
-9. All three repository-local skills validate and accurately orchestrate their intended workflows.
+9. All four repository-local skills validate and accurately orchestrate their intended workflows.
 10. The canonical inspiration-page template validates and builds without a persisted Sites binding.
 11. Format, check, lint, and test commands pass.
