@@ -1,0 +1,37 @@
+{
+  "name": "creative-inspo-page-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -b && vite build && node scripts/stage-sites-build.mjs",
+    "check": "tsc -b --pretty false",
+    "dev": "vite",
+    "format": "biome format --config-path=biome.template.json --write .",
+    "format:check": "biome format --config-path=biome.template.json .",
+    "lint": "biome lint --config-path=biome.template.json .",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "validate": "pnpm format:check && pnpm check && pnpm lint && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "4.1.18",
+    "tailwindcss": "4.1.18",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.5",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.4",
+    "typescript": "7.0.2",
+    "vite": "7.3.1",
+    "vitest": "4.1.10"
+  }
+}

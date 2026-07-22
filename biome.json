@@ -1,7 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
   "files": {
-    "includes": ["**", "!!dist", "!!node_modules", "!!.pnpm-store", "!!coverage"]
+    "includes": [
+      "**",
+      "!!dist",
+      "!!node_modules",
+      "!!.pnpm-store",
+      "!!coverage",
+      "!!.codex-tmp-*",
+      "!!templates/inspo-page"
+    ]
   },
   "formatter": {
     "enabled": true,
