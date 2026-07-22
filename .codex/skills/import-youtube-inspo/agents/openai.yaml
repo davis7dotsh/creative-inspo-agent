@@ -1,0 +1,4 @@
+interface:
+  display_name: "Import YouTube Inspo"
+  short_description: "Import and enrich YouTube inspiration"
+  default_prompt: "Use $import-youtube-inspo to import these YouTube URLs into my local inspiration library."

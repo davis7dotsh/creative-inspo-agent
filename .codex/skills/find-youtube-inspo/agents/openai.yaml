@@ -1,0 +1,4 @@
+interface:
+  display_name: "Find YouTube Inspo"
+  short_description: "Search and curate YouTube inspiration"
+  default_prompt: "Use $find-youtube-inspo to find title and thumbnail inspiration for my video idea."
