@@ -1,0 +1,4 @@
+interface:
+  display_name: "Generate Inspo"
+  short_description: "Remix curated references into thumbnail concepts"
+  default_prompt: "Use $generate-inspo to turn my selected YouTube references into new thumbnail concepts and iterate on them."

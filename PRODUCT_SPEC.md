@@ -14,8 +14,9 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 4. Once every item is prepared, the skill submits one JSON batch to `creative-agent` for an atomic database upsert.
 5. In another Codex task, invoke `find-youtube-inspo` with a creative brief, reference image, reference video, title idea, thumbnail direction, or any combination.
 6. The skill uses flexible CLI search primitives, agent judgment, and selective visual review to return concise, diverse recommendations and help iterate on titles and thumbnails.
-7. Invoke `create-inspo-page` with the working selection to create and iterate on an independent React/Vite inspiration wall.
-8. Preview the board locally or publish it through Sites when requested.
+7. Invoke `generate-inspo` to distill the strongest references into original title-and-thumbnail directions and generate iterative thumbnail assets.
+8. Invoke `create-inspo-page` with the working selection to create and iterate on an independent React/Vite inspiration wall, or append generated concepts to an existing board.
+9. Preview the board locally or publish it through Sites when requested.
 
 ## V1 scope
 
@@ -31,7 +32,7 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 - Listing, showing, deleting, and reindexing videos.
 - OpenAI API-key login, logout, and status commands.
 - JSON-first command input and output with optional human-readable tables.
-- Repository-local `import-youtube-inspo`, `find-youtube-inspo`, and `create-inspo-page` skills under `.codex/skills/`.
+- Repository-local `import-youtube-inspo`, `find-youtube-inspo`, `generate-inspo`, and `create-inspo-page` skills under `.codex/skills/`.
 - A canonical, self-contained React/Vite inspiration-page template.
 - Independent local boards with optional Sites publishing.
 
@@ -151,6 +152,14 @@ Skills should remain concise and high-freedom. They describe available capabilit
 - Keep a working selection within the Codex task and provide concise recommendations with reasoning.
 - Favor relevance while introducing enough diversity to support inspiration.
 
+### `generate-inspo`
+
+- Start from a meaningful working selection, invoking `find-youtube-inspo` first when discovery is incomplete.
+- Distill roughly three closest title and thumbnail references into transferable creative traits.
+- Develop distinct title-and-thumbnail directions and use image generation for a couple of visual alternatives by default.
+- Iterate non-destructively from user feedback while preserving prior rounds.
+- Append generated concepts to an active inspiration-page project when one exists and validate the updated project.
+
 ### `create-inspo-page`
 
 - Turn the current task's working selection into an independent React/Vite project.
@@ -197,6 +206,6 @@ V1 is complete when:
 6. Videos can be searched through title semantics, thumbnail-description semantics, keywords, and supported filters.
 7. Videos can be listed, inspected, deleted, and reindexed.
 8. JSON output is stable and human-readable output is useful.
-9. All three repository-local skills validate and accurately orchestrate their intended workflows.
+9. All four repository-local skills validate and accurately orchestrate their intended workflows.
 10. The canonical inspiration-page template validates and builds without a persisted Sites binding.
 11. Format, check, lint, and test commands pass.
