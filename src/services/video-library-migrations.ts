@@ -57,7 +57,48 @@ const thumbnailMutationLock = Effect.gen(function* () {
   yield* sql`INSERT INTO thumbnail_mutation_lock(singleton, generation) VALUES (1, 0)`
 })
 
+const normalizedChannels = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+
+  yield* sql`
+    CREATE TABLE channels (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      avatar_urls_json TEXT CHECK (
+        avatar_urls_json IS NULL OR json_valid(avatar_urls_json)
+      ),
+      avatar_path TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (
+        (avatar_urls_json IS NULL AND avatar_path IS NULL) OR
+        (avatar_urls_json IS NOT NULL AND avatar_path IS NOT NULL)
+      )
+    ) STRICT
+  `
+
+  yield* sql`
+    INSERT INTO channels(id, title, avatar_urls_json, avatar_path, created_at, updated_at)
+    SELECT
+      latest.channel_id,
+      latest.channel_title,
+      NULL,
+      NULL,
+      (SELECT MIN(created_at) FROM videos WHERE channel_id = latest.channel_id),
+      (SELECT MAX(updated_at) FROM videos WHERE channel_id = latest.channel_id)
+    FROM videos AS latest
+    WHERE latest.rowid = (
+      SELECT candidate.rowid
+      FROM videos AS candidate
+      WHERE candidate.channel_id = latest.channel_id
+      ORDER BY candidate.updated_at DESC, candidate.id ASC
+      LIMIT 1
+    )
+  `
+})
+
 export const videoLibraryMigrations = SqliteMigrator.fromRecord({
   "1_initial": initial,
   "2_thumbnail_mutation_lock": thumbnailMutationLock,
+  "3_normalized_channels": normalizedChannels,
 })

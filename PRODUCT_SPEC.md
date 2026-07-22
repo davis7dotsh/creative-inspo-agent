@@ -10,12 +10,13 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 
 1. Invoke `import-youtube-inspo` with pasted video, channel, or playlist URLs.
 2. The skill uses the separately installed `oytc` CLI to resolve public YouTube data.
-3. The skill downloads the best available thumbnail, uses GPT-5.6 Luna sub-agents to produce factual thumbnail descriptions, and asks `creative-agent` to embed the searchable text.
-4. Once every item is prepared, the skill submits one JSON batch to `creative-agent` for an atomic database upsert.
+3. The skill downloads the best available video thumbnail and channel avatar, uses GPT-5.6 Luna sub-agents to produce factual thumbnail descriptions, and asks `creative-agent` to embed the searchable text.
+4. Once every item is prepared, the skill submits videos and normalized channels in one JSON batch to `creative-agent` for an atomic database upsert.
 5. In another Codex task, invoke `find-youtube-inspo` with a creative brief, reference image, reference video, title idea, thumbnail direction, or any combination.
 6. The skill uses flexible CLI search primitives, agent judgment, and selective visual review to return concise, diverse recommendations and help iterate on titles and thumbnails.
 7. Invoke `create-inspo-page` with the working selection to create and iterate on an independent React/Vite inspiration wall.
 8. Preview the board locally or publish it through Sites when requested.
+9. Run `pnpm assets:dev` to casually browse the complete live corpus in the local Assets Explorer.
 
 ## V1 scope
 
@@ -34,6 +35,7 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 - Repository-local `import-youtube-inspo`, `find-youtube-inspo`, and `create-inspo-page` skills under `.codex/skills/`.
 - A canonical, self-contained React/Vite inspiration-page template.
 - Independent local boards with optional Sites publishing.
+- A single-user, read-only Assets Explorer for the live local YouTube corpus.
 
 ### Deferred
 
@@ -61,6 +63,12 @@ Each stored video contains:
 - A thumbnail-description embedding.
 - Embedding model and dimensions so records can be reindexed safely.
 - Created and updated timestamps.
+
+Each distinct YouTube channel has one normalized record keyed by channel ID containing its current
+title, every source avatar URL and dimension returned by YouTube, the locally retained
+highest-resolution avatar, and created and updated timestamps. Legacy video-only batches create a
+channel identity with nullable avatar data; a later import enriches it without duplicating the
+channel.
 
 Descriptions should capture visible text, subjects, composition, colors, setting, action, and visual style without inventing subjective themes or broad tags.
 
@@ -91,6 +99,7 @@ All user state is created automatically beneath `~/.creative-inspo-agent/`:
   creative-agent.sqlite
   assets/
     thumbnails/
+    channel-avatars/
   staging/
   boards/
 ```
@@ -99,9 +108,28 @@ All user state is created automatically beneath `~/.creative-inspo-agent/`:
 - SQLite stores structured video metadata and local vectors.
 - A local SQLite vector extension provides similarity search.
 - Only the best thumbnail is downloaded; all source thumbnail URLs remain in SQLite.
+- Only the best channel avatar is downloaded; all source avatar URLs remain in SQLite.
 - Staging keeps incomplete imports invisible. A failed batch leaves no visible database records.
 
 The future hosted architecture will keep the same high-level capability contracts while implementing metadata in D1, blobs in R2, and vectors in Vectorize.
+
+## Assets Explorer
+
+The v1 explorer is a desktop-first React/Vite application under `apps/assets-explorer/` with a
+functional two-column mobile layout. It presents one raw YouTube video per dense grid card, opens
+cards on YouTube in a new tab, and has no authentication or mutation actions.
+
+The top area contains avatar-backed creator controls that wrap into multiple rows and allow exactly
+one creator filter at a time. The available orders are ephemeral random (the default), newest,
+oldest, and most viewed. Results load through cursor-based infinite scrolling. Missing or invalid
+local media is not rendered. Card metadata includes title, creator, published date, view count, and
+duration. The top controls hide while scrolling down and return while scrolling up.
+
+The browser client talks to a loopback-only Effect v4 HTTP server. Typed `HttpApi` endpoints expose
+creator and asset JSON, while raw guarded routes stream thumbnails and avatars without returning
+filesystem paths. Portable `AssetCatalog` and `AssetMedia` service contracts separate the HTTP API
+from the local read-only SQLite/filesystem Layers. A hosted deployment can replace those Layers with
+remote metadata and blob implementations without changing the client contract.
 
 ## CLI design
 
@@ -117,6 +145,7 @@ Initial capability groups:
 - `config` or `status`: initialize and inspect local state safely.
 - `embed`: create OpenAI text embeddings for prepared inputs.
 - `videos`: atomically upsert a prepared JSON batch, search with flexible signals and filters, list, show, delete, and reindex.
+- `channels`: atomically upsert channel avatar metadata, list normalized channels, and show one channel.
 
 Canonical agent I/O is JSON. Batch ingestion accepts JSON through stdin. Human-readable tables are optional presentation modes, not the data contract.
 

@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!!dist",
+      "!!**/dist",
       "!!node_modules",
       "!!.pnpm-store",
       "!!coverage",

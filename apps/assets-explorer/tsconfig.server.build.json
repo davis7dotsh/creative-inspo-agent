@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist/server",
+    "types": ["node"]
+  },
+  "include": ["src/server/**/*.ts", "src/contracts/**/*.ts"],
+  "exclude": ["test/**/*.ts"]
+}
