@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Inspo Page"
+  short_description: "Build and publish a visual inspiration wall"
+  default_prompt: "Use $create-inspo-page to turn my selected YouTube references into an inspiration page."

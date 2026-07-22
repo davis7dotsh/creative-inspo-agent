@@ -14,6 +14,8 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 4. Once every item is prepared, the skill submits one JSON batch to `creative-agent` for an atomic database upsert.
 5. In another Codex task, invoke `find-youtube-inspo` with a creative brief, reference image, reference video, title idea, thumbnail direction, or any combination.
 6. The skill uses flexible CLI search primitives, agent judgment, and selective visual review to return concise, diverse recommendations and help iterate on titles and thumbnails.
+7. Invoke `create-inspo-page` with the working selection to create and iterate on an independent React/Vite inspiration wall.
+8. Preview the board locally or publish it through Sites when requested.
 
 ## V1 scope
 
@@ -29,7 +31,9 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 - Listing, showing, deleting, and reindexing videos.
 - OpenAI API-key login, logout, and status commands.
 - JSON-first command input and output with optional human-readable tables.
-- Repository-local `import-youtube-inspo` and `find-youtube-inspo` skills under `.codex/skills/`.
+- Repository-local `import-youtube-inspo`, `find-youtube-inspo`, and `create-inspo-page` skills under `.codex/skills/`.
+- A canonical, self-contained React/Vite inspiration-page template.
+- Independent local boards with optional Sites publishing.
 
 ### Deferred
 
@@ -38,7 +42,6 @@ The first version is for one user and focuses only on YouTube videos. Simplicity
 - Cloudflare D1, R2, and Vectorize implementations.
 - Recurring statistics refresh.
 - Persistent search-session selections.
-- Inspiration-board implementation and publishing.
 - Named board templates.
 
 ## YouTube video data
@@ -148,14 +151,22 @@ Skills should remain concise and high-freedom. They describe available capabilit
 - Keep a working selection within the Codex task and provide concise recommendations with reasoning.
 - Favor relevance while introducing enough diversity to support inspiration.
 
+### `create-inspo-page`
+
+- Turn the current task's working selection into an independent React/Vite project.
+- Start from the canonical template without introducing a shared renderer or board manifest.
+- Copy selected thumbnails and avatars into the board and keep video metadata and links together.
+- Iterate directly on the copied project and validate it before presentation.
+- Preview locally or create a fresh Sites binding and publish when requested.
+
 ## Inspiration boards
 
-Board work is deferred to a separate effort. The intended direction is deliberately loose:
+Board creation is deliberately loose:
 
 - Each board is an independent TypeScript React Vite project under `~/.creative-inspo-agent/boards/<name>/`.
 - Boards do not share a renderer, package, schema, or runtime dependency.
 - There is no `board.json` requirement.
-- A future skill will start from guidelines and a strong example template, then let the agent create and edit the actual Vite project.
+- The repository-local `create-inspo-page` skill starts from guidelines and a strong example template, then lets the agent create, edit, preview, and optionally publish the actual Vite project.
 - The default visual direction is a polished, responsive wall of thumbnails with titles, channel information, and restrained statistics—minimal chrome, no walls of text, unnecessary subheadings, or all-caps decoration.
 - Clicking a video opens YouTube in a new tab.
 - Browser automation may be used for preview and visual validation; browser login is deferred.
@@ -186,5 +197,6 @@ V1 is complete when:
 6. Videos can be searched through title semantics, thumbnail-description semantics, keywords, and supported filters.
 7. Videos can be listed, inspected, deleted, and reindexed.
 8. JSON output is stable and human-readable output is useful.
-9. Both repository-local skills validate and accurately orchestrate their intended workflows.
-10. Format, check, lint, and test commands pass.
+9. All three repository-local skills validate and accurately orchestrate their intended workflows.
+10. The canonical inspiration-page template validates and builds without a persisted Sites binding.
+11. Format, check, lint, and test commands pass.

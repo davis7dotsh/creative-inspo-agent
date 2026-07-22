@@ -1,6 +1,6 @@
 # Creative Agent
 
-Creative Agent is a local-first CLI and pair of Codex skills for collecting and searching YouTube inspiration.
+Creative Agent is a local-first CLI and three Codex skills for collecting, searching, and presenting YouTube inspiration.
 
 ## Run from a checkout
 
