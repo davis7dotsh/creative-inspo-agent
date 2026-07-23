@@ -17,6 +17,7 @@
     "dist"
   ],
   "scripts": {
+    "assets:dev": "pnpm --filter @creative-agent/assets-explorer dev",
     "build": "tsc -p tsconfig.build.json",
     "check": "pnpm run check:types && pnpm run check:effect",
     "check:effect": "effect-tsgo diagnostics --project tsconfig.json --format pretty --strict",
@@ -28,7 +29,8 @@
     "lint": "biome lint .",
     "precheck:effect": "node scripts/ensure-effect-tsgo-executable.mjs",
     "test": "vitest run",
-    "validate": "pnpm run format:check && pnpm run check && pnpm run lint && pnpm run test && pnpm run build && pnpm run validate:skills",
+    "validate": "pnpm run format:check && pnpm run check && pnpm run lint && pnpm run test && pnpm run build && pnpm run validate:skills && pnpm run validate:assets-explorer",
+    "validate:assets-explorer": "pnpm --filter @creative-agent/assets-explorer validate",
     "validate:skills": "node scripts/validate-skills.mjs"
   },
   "packageManager": "pnpm@11.10.0",

@@ -42,10 +42,28 @@ Canonical input and output are JSON. Commands that accept JSON read it from stdi
 ```sh
 pnpm cli schema embed
 pnpm cli schema videos-upsert
+pnpm cli schema channels-upsert
 pnpm cli schema videos-search
 ```
 
 Local state is initialized beneath `~/.creative-inspo-agent/`. Set `CREATIVE_AGENT_HOME` to use a different root.
+
+Video imports may include normalized channel records and retained avatars in the same atomic
+`videos upsert` batch. `channels upsert` is also available for channel-only enrichment and
+backfills without re-embedding videos.
+
+## Browse the local corpus
+
+Start the read-only Assets Explorer with one command:
+
+```sh
+pnpm assets:dev
+```
+
+The React/Vite client reads the live local database through a loopback-only Effect HTTP server.
+It provides dense infinite browsing, avatar-based creator filtering, random/newest/oldest/most
+viewed sorting, and direct YouTube links without authentication or write actions. See
+`apps/assets-explorer/README.md` for its service boundaries and configuration.
 
 ## Validate
 

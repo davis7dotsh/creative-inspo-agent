@@ -5,8 +5,12 @@ import { Reactivity } from "effect/unstable/reactivity"
 import { SqlClient, type Statement } from "effect/unstable/sql"
 import { NotFoundError, StorageError, ValidationError } from "../domain/errors.js"
 import {
+  ChannelAvatarVariant,
+  type ChannelAvatarVariant as ChannelAvatarVariantValue,
   type Embedding,
   minimumVideoDurationSeconds,
+  type PreparedChannel,
+  type PreparedChannelBatch,
   type PreparedVideo,
   type PreparedVideoBatch,
   ThumbnailVariant,
@@ -35,6 +39,15 @@ export interface StoredVideo {
   readonly thumbnailDescription: string
   readonly embeddingModel: string
   readonly embeddingDimensions: number
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface StoredChannel {
+  readonly id: string
+  readonly title: string
+  readonly avatars: ReadonlyArray<ChannelAvatarVariantValue>
+  readonly localAvatarPath?: string
   readonly createdAt: string
   readonly updatedAt: string
 }
@@ -81,6 +94,12 @@ export interface UpsertResult {
   readonly updated: number
 }
 
+export interface ChannelUpsertResult {
+  readonly total: number
+  readonly inserted: number
+  readonly updated: number
+}
+
 export interface ListVideosOptions {
   readonly limit?: number
   readonly offset?: number
@@ -109,6 +128,11 @@ export interface VideoLibraryShape {
   readonly replaceEmbeddings: (
     batch: VideoEmbeddingUpdateBatch,
   ) => Effect.Effect<void, NotFoundError | StorageError | ValidationError>
+  readonly upsertPreparedChannels: (
+    batch: PreparedChannelBatch,
+  ) => Effect.Effect<ChannelUpsertResult, StorageError | ValidationError>
+  readonly listChannels: Effect.Effect<ReadonlyArray<StoredChannel>, StorageError>
+  readonly showChannel: (id: string) => Effect.Effect<StoredChannel, NotFoundError | StorageError>
 }
 
 export class VideoLibrary extends Context.Service<VideoLibrary, VideoLibraryShape>()(
@@ -137,6 +161,15 @@ interface SemanticSearchRow extends StoredVideoRow {
   readonly distance: number
 }
 
+interface StoredChannelRow {
+  readonly id: string
+  readonly title: string
+  readonly avatar_urls_json: string | null
+  readonly avatar_path: string | null
+  readonly created_at: string
+  readonly updated_at: string
+}
+
 interface PreparedForStorage {
   readonly video: PreparedVideo
   readonly thumbnailPath: string
@@ -146,6 +179,12 @@ interface PreparedForStorage {
   readonly publishedEpoch: number
   readonly titleEmbedding: Uint8Array
   readonly thumbnailEmbedding: Uint8Array
+}
+
+interface PreparedChannelForStorage {
+  readonly channel: PreparedChannel
+  readonly avatarPath: string
+  readonly avatarBytes: Uint8Array
 }
 
 interface VideoLibraryLayerOptions {
@@ -287,6 +326,30 @@ const decodeStoredVideo = (row: StoredVideoRow) =>
     } satisfies StoredVideo
   })
 
+const decodeStoredChannel = (row: StoredChannelRow) =>
+  Effect.gen(function* () {
+    const avatarUrlsJson = row.avatar_urls_json
+    const avatars =
+      avatarUrlsJson === null
+        ? []
+        : yield* Effect.try({
+            try: () => JSON.parse(avatarUrlsJson),
+            catch: (cause) => storageFailure("decode channel avatar metadata", cause),
+          }).pipe(
+            Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(ChannelAvatarVariant))),
+            Effect.mapError((cause) => storageFailure("decode channel avatar metadata", cause)),
+          )
+
+    return {
+      id: row.id,
+      title: row.title,
+      avatars,
+      ...(row.avatar_path === null ? {} : { localAvatarPath: row.avatar_path }),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    } satisfies StoredChannel
+  })
+
 const makeVectorFilterClauses = (sql: SqlClient.SqlClient, filters: VideoFilters | undefined) => {
   const clauses: Array<Statement.Fragment> = []
   if (filters?.channel !== undefined) {
@@ -379,56 +442,105 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
         }),
       )
 
-    const sweepUnreferencedThumbnails = withThumbnailMutationLock(
+    const sweepUnreferencedAssets = withThumbnailMutationLock(
       Effect.gen(function* () {
-        const referencedRows = yield* sql<{ readonly thumbnail_path: string }>`
+        const referencedThumbnailRows = yield* sql<{ readonly thumbnail_path: string }>`
           SELECT DISTINCT thumbnail_path FROM videos
         `
-        const referenced = new Set(referencedRows.map((row) => row.thumbnail_path))
-        const entries = yield* fs.readDirectory(paths.thumbnailsDirectory)
-        yield* Effect.forEach(
-          entries,
-          (entry) => {
-            const thumbnailPath = path.join(paths.thumbnailsDirectory, entry)
-            return referenced.has(thumbnailPath)
-              ? Effect.void
-              : fs.remove(thumbnailPath, { force: true })
+        const referencedAvatarRows = yield* sql<{ readonly avatar_path: string }>`
+          SELECT DISTINCT avatar_path FROM channels WHERE avatar_path IS NOT NULL
+        `
+        const directories = [
+          {
+            directory: paths.thumbnailsDirectory,
+            referenced: new Set(referencedThumbnailRows.map((row) => row.thumbnail_path)),
           },
-          { discard: true },
+          {
+            directory: paths.channelAvatarsDirectory,
+            referenced: new Set(referencedAvatarRows.map((row) => row.avatar_path)),
+          },
+        ]
+        yield* Effect.forEach(directories, ({ directory, referenced }) =>
+          Effect.gen(function* () {
+            const entries = yield* fs.readDirectory(directory)
+            yield* Effect.forEach(
+              entries,
+              (entry) => {
+                const assetPath = path.join(directory, entry)
+                return referenced.has(assetPath)
+                  ? Effect.void
+                  : fs.remove(assetPath, { force: true })
+              },
+              { discard: true },
+            )
+          }),
         )
       }),
-    ).pipe(Effect.mapError((cause) => storageFailure("clean up thumbnail assets", cause)))
+    ).pipe(Effect.mapError((cause) => storageFailure("clean up retained assets", cause)))
 
-    yield* sweepUnreferencedThumbnails
+    const sweepUnreferencedAssetsBestEffort = sweepUnreferencedAssets.pipe(Effect.ignore)
 
-    const prepareThumbnail = (video: PreparedVideo) =>
+    yield* sweepUnreferencedAssets
+
+    const prepareAsset = (sourcePath: string, label: string, destinationDirectory: string) =>
       Effect.gen(function* () {
         const stagingRoot = yield* fs.realPath(paths.stagingDirectory)
-        const source = yield* fs.realPath(video.localThumbnailPath)
+        const source = yield* fs.realPath(sourcePath)
         const relative = path.relative(stagingRoot, source)
         if (relative === "" || relative === ".." || relative.startsWith(`..${path.sep}`)) {
           return yield* validationFailure(
-            `thumbnail for ${video.id} must be a file inside ${paths.stagingDirectory}`,
+            `${label} must be a file inside ${paths.stagingDirectory}`,
           )
         }
         const info = yield* fs.stat(source)
         if (info.type !== "File") {
-          return yield* validationFailure(`thumbnail for ${video.id} is not a regular file`)
+          return yield* validationFailure(`${label} is not a regular file`)
         }
 
         const bytes = yield* fs.readFile(source)
         const hash = createHash("sha256").update(bytes).digest("hex")
         const candidateExtension = path.extname(source).toLowerCase()
         const extension = /^\.[a-z0-9]{1,5}$/.test(candidateExtension) ? candidateExtension : ".img"
-        const destination = path.join(paths.thumbnailsDirectory, `${hash}${extension}`)
+        const destination = path.join(destinationDirectory, `${hash}${extension}`)
         return { path: destination, bytes }
       }).pipe(
         Effect.mapError((cause) =>
-          cause instanceof ValidationError
-            ? cause
-            : storageFailure(`prepare thumbnail for ${video.id}`, cause),
+          cause instanceof ValidationError ? cause : storageFailure(`prepare ${label}`, cause),
         ),
       )
+
+    const prepareThumbnail = (video: PreparedVideo) =>
+      prepareAsset(video.localThumbnailPath, `thumbnail for ${video.id}`, paths.thumbnailsDirectory)
+
+    const prepareChannel = (channel: PreparedChannel) =>
+      Effect.gen(function* () {
+        for (const [value, label] of [
+          [channel.id, "channel id"],
+          [channel.title, "channel title"],
+        ] as const) {
+          if (value.trim().length === 0) {
+            return yield* validationFailure(`${label} cannot be empty`)
+          }
+        }
+        if (channel.avatars.length === 0) {
+          return yield* validationFailure(`channel ${channel.id} must include avatar metadata`)
+        }
+        for (const avatar of channel.avatars) {
+          if (avatar.url.trim().length === 0) {
+            return yield* validationFailure(`channel ${channel.id} has an empty avatar URL`)
+          }
+        }
+        const avatar = yield* prepareAsset(
+          channel.localAvatarPath,
+          `avatar for channel ${channel.id}`,
+          paths.channelAvatarsDirectory,
+        )
+        return {
+          channel,
+          avatarPath: avatar.path,
+          avatarBytes: avatar.bytes,
+        } satisfies PreparedChannelForStorage
+      })
 
     const prepareVideo = (video: PreparedVideo) =>
       Effect.gen(function* () {
@@ -488,7 +600,7 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
         } satisfies PreparedForStorage
       })
 
-    const insertVector = (prepared: PreparedForStorage) =>
+    const insertVector = (prepared: PreparedForStorage, channelTitle: string) =>
       sql`
         INSERT INTO video_vectors(
           video_id,
@@ -505,13 +617,102 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
           ${prepared.titleEmbedding},
           ${prepared.thumbnailEmbedding},
           ${prepared.video.channelId},
-          ${prepared.video.channelTitle},
+          ${channelTitle},
           ${prepared.publishedEpoch},
           ${prepared.video.durationSeconds},
           ${prepared.viewCount},
           ${prepared.video.titleEmbedding.model}
         )
       `
+
+    const prepareChannelBatch = (channels: ReadonlyArray<PreparedChannel>) =>
+      Effect.gen(function* () {
+        const ids = channels.map((channel) => channel.id)
+        if (new Set(ids).size !== ids.length) {
+          return yield* validationFailure("a prepared channel batch cannot contain duplicate ids")
+        }
+        return yield* Effect.forEach(channels, prepareChannel)
+      })
+
+    const synchronizeChannelTitle = (id: string, title: string) =>
+      Effect.gen(function* () {
+        yield* sql`
+          UPDATE videos
+          SET channel_title = ${title}
+          WHERE channel_id = ${id}
+        `
+        yield* sql`
+          UPDATE video_vectors
+          SET channel_title = ${title}
+          WHERE channel_id = ${id}
+        `
+      })
+
+    const persistPreparedChannels = (
+      preparedChannels: ReadonlyArray<PreparedChannelForStorage>,
+      now: string,
+    ) =>
+      Effect.gen(function* () {
+        let inserted = 0
+        let updated = 0
+
+        for (const item of preparedChannels) {
+          const existing = yield* sql<{ readonly id: string }>`
+            SELECT id FROM channels WHERE id = ${item.channel.id}
+          `
+          if (existing.length === 0) {
+            inserted += 1
+          } else {
+            updated += 1
+          }
+
+          yield* sql`
+            INSERT INTO channels(
+              id,
+              title,
+              avatar_urls_json,
+              avatar_path,
+              created_at,
+              updated_at
+            ) VALUES (
+              ${item.channel.id},
+              ${item.channel.title},
+              ${JSON.stringify(item.channel.avatars)},
+              ${item.avatarPath},
+              ${now},
+              ${now}
+            )
+            ON CONFLICT(id) DO UPDATE SET
+              title = excluded.title,
+              avatar_urls_json = excluded.avatar_urls_json,
+              avatar_path = excluded.avatar_path,
+              updated_at = excluded.updated_at
+          `
+          yield* synchronizeChannelTitle(item.channel.id, item.channel.title)
+          if (!(yield* fs.exists(item.avatarPath))) {
+            yield* fs.writeFile(item.avatarPath, item.avatarBytes)
+          }
+        }
+
+        return { total: preparedChannels.length, inserted, updated }
+      })
+
+    const upsertPreparedChannels = Effect.fn("VideoLibrary.upsertPreparedChannels")(function* (
+      batch: PreparedChannelBatch,
+    ) {
+      const preparedChannels = yield* prepareChannelBatch(batch.channels)
+      if (preparedChannels.length === 0) {
+        return { total: 0, inserted: 0, updated: 0 }
+      }
+      const result = yield* withThumbnailMutationLock(
+        persistPreparedChannels(preparedChannels, new Date().toISOString()),
+      ).pipe(
+        Effect.mapError((cause) => storageFailure("upsert prepared channels", cause)),
+        Effect.onError(() => sweepUnreferencedAssetsBestEffort),
+      )
+      yield* sweepUnreferencedAssetsBestEffort
+      return result
+    })
 
     const upsertPreparedBatch = Effect.fn("VideoLibrary.upsertPreparedBatch")(function* (
       batch: PreparedVideoBatch,
@@ -522,8 +723,26 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
       }
 
       const prepared = yield* Effect.forEach(batch.videos, prepareVideo)
-      if (prepared.length === 0) {
+      const preparedChannels = yield* prepareChannelBatch(batch.channels ?? [])
+      if (prepared.length === 0 && preparedChannels.length === 0) {
         return { total: 0, inserted: 0, updated: 0 }
+      }
+
+      const enrichedChannelIds = new Set(preparedChannels.map(({ channel }) => channel.id))
+      const authoritativeChannelTitles = new Map(
+        preparedChannels.map(({ channel }) => [channel.id, channel.title] as const),
+      )
+      for (const { video } of prepared) {
+        if (enrichedChannelIds.has(video.channelId)) {
+          continue
+        }
+        const existingTitle = authoritativeChannelTitles.get(video.channelId)
+        if (existingTitle !== undefined && existingTitle !== video.channelTitle) {
+          return yield* validationFailure(
+            `videos for channel ${video.channelId} disagree on the channel title`,
+          )
+        }
+        authoritativeChannelTitles.set(video.channelId, video.channelTitle)
       }
 
       const persist = withThumbnailMutationLock(
@@ -532,7 +751,31 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
           let updated = 0
           const now = new Date().toISOString()
 
+          yield* persistPreparedChannels(preparedChannels, now)
+
+          for (const [id, title] of authoritativeChannelTitles) {
+            if (enrichedChannelIds.has(id)) {
+              continue
+            }
+            yield* sql`
+              INSERT INTO channels(
+                id,
+                title,
+                avatar_urls_json,
+                avatar_path,
+                created_at,
+                updated_at
+              ) VALUES (${id}, ${title}, NULL, NULL, ${now}, ${now})
+              ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                updated_at = excluded.updated_at
+            `
+            yield* synchronizeChannelTitle(id, title)
+          }
+
           for (const item of prepared) {
+            const authoritativeChannelTitle =
+              authoritativeChannelTitles.get(item.video.channelId) ?? item.video.channelTitle
             const existing = yield* sql<{ readonly id: string }>`
               SELECT id FROM videos WHERE id = ${item.video.id}
             `
@@ -563,7 +806,7 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
                     ${item.video.id},
                     ${item.video.title},
                     ${item.video.channelId},
-                    ${item.video.channelTitle},
+                    ${authoritativeChannelTitle},
                     ${new Date(item.publishedEpoch).toISOString()},
                     ${item.video.durationSeconds},
                     ${JSON.stringify(item.video.thumbnails)},
@@ -592,7 +835,7 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
                     updated_at = excluded.updated_at
             `
             yield* sql`DELETE FROM video_vectors WHERE video_id = ${item.video.id}`
-            yield* insertVector(item)
+            yield* insertVector(item, authoritativeChannelTitle)
           }
 
           for (const item of prepared) {
@@ -605,10 +848,8 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
         }),
       ).pipe(Effect.mapError((cause) => storageFailure("upsert prepared video batch", cause)))
 
-      const result = yield* persist.pipe(
-        Effect.onError(() => sweepUnreferencedThumbnails.pipe(Effect.ignore)),
-      )
-      yield* sweepUnreferencedThumbnails
+      const result = yield* persist.pipe(Effect.onError(() => sweepUnreferencedAssetsBestEffort))
+      yield* sweepUnreferencedAssetsBestEffort
       return result
     })
 
@@ -715,6 +956,25 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
       return yield* decodeStoredVideo(row)
     })
 
+    const listChannels = Effect.gen(function* () {
+      const rows = yield* sql<StoredChannelRow>`
+        SELECT * FROM channels
+        ORDER BY title COLLATE NOCASE ASC, id ASC
+      `.pipe(Effect.mapError((cause) => storageFailure("list channels", cause)))
+      return yield* Effect.forEach(rows, decodeStoredChannel)
+    }).pipe(Effect.withSpan("VideoLibrary.listChannels"))
+
+    const showChannel = Effect.fn("VideoLibrary.showChannel")(function* (id: string) {
+      const rows = yield* sql<StoredChannelRow>`SELECT * FROM channels WHERE id = ${id}`.pipe(
+        Effect.mapError((cause) => storageFailure("show channel", cause)),
+      )
+      const row = rows[0]
+      if (row === undefined) {
+        return yield* new NotFoundError({ resource: "channel", id })
+      }
+      return yield* decodeStoredChannel(row)
+    })
+
     const deleteMany = Effect.fn("VideoLibrary.deleteMany")(function* (ids: ReadonlyArray<string>) {
       if (ids.length === 0) {
         return yield* validationFailure("at least one video id is required for deletion")
@@ -744,7 +1004,7 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
           cause instanceof NotFoundError ? cause : storageFailure("delete videos", cause),
         ),
       )
-      yield* sweepUnreferencedThumbnails
+      yield* sweepUnreferencedAssetsBestEffort
     })
 
     const deleteVideo = Effect.fn("VideoLibrary.delete")((id: string) => deleteMany([id]))
@@ -839,6 +1099,9 @@ const makeVideoLibrary = (options: VideoLibraryLayerOptions) =>
       delete: deleteVideo,
       deleteMany,
       replaceEmbeddings,
+      upsertPreparedChannels,
+      listChannels,
+      showChannel,
     })
   }).pipe(
     Effect.mapError((cause) =>

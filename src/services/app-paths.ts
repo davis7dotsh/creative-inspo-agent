@@ -8,6 +8,7 @@ export type AppPathsShape = {
   readonly databaseFile: string
   readonly assetsDirectory: string
   readonly thumbnailsDirectory: string
+  readonly channelAvatarsDirectory: string
   readonly stagingDirectory: string
   readonly boardsDirectory: string
 }
@@ -23,6 +24,7 @@ export const makeAppPaths = (path: Path.Path, root: string): AppPathsShape => {
     databaseFile: path.join(resolvedRoot, "creative-agent.sqlite"),
     assetsDirectory,
     thumbnailsDirectory: path.join(assetsDirectory, "thumbnails"),
+    channelAvatarsDirectory: path.join(assetsDirectory, "channel-avatars"),
     stagingDirectory: path.join(resolvedRoot, "staging"),
     boardsDirectory: path.join(resolvedRoot, "boards"),
   }
@@ -69,6 +71,7 @@ export const initializeAppPaths = Effect.gen(function* () {
     paths.root,
     paths.assetsDirectory,
     paths.thumbnailsDirectory,
+    paths.channelAvatarsDirectory,
     paths.stagingDirectory,
     paths.boardsDirectory,
   ]

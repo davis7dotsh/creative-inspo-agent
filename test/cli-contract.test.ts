@@ -93,6 +93,21 @@ const preparedVideoInput = (root: string, id: string, thumbnail = `thumbnail:${i
   }
 }
 
+const preparedChannelInput = (root: string, id: string, avatar = `avatar:${id}`) => {
+  const localAvatarPath = join(root, "staging", `${id}-avatar.jpg`)
+  mkdirSync(join(root, "staging"), { recursive: true })
+  writeFileSync(localAvatarPath, avatar)
+  return {
+    id,
+    title: `Channel ${id}`,
+    avatars: [
+      { url: `https://example.com/${id}-default.jpg`, width: 88, height: 88 },
+      { url: `https://example.com/${id}-high.jpg`, width: 800, height: 800 },
+    ],
+    localAvatarPath,
+  }
+}
+
 const storedVideo = (id: string): StoredVideo => ({
   id,
   title: `Title ${id}`,
@@ -170,6 +185,39 @@ describe("CLI process contract", () => {
     })
   })
 
+  it("publishes channel-avatar fields in both ingestion schemas", () => {
+    const channelSchema = runCli(["schema", "channels-upsert"])
+    const videoSchema = runCli(["schema", "videos-upsert"])
+
+    expect(channelSchema.status).toBe(0)
+    expect(channelSchema.stderr).toBe("")
+    expect(JSON.parse(channelSchema.stdout)).toMatchObject({
+      ok: true,
+      data: {
+        command: "creative-agent channels upsert",
+        schema: {
+          schema: {
+            properties: {
+              channels: {
+                items: {
+                  properties: {
+                    id: { type: "string" },
+                    title: { type: "string" },
+                    avatars: { type: "array" },
+                    localAvatarPath: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+    expect(videoSchema.status).toBe(0)
+    expect(videoSchema.stderr).toBe("")
+    expect(JSON.parse(videoSchema.stdout).data.schema.schema.properties.channels.type).toBe("array")
+  })
+
   it("prints safe JSON failures on stderr and exits nonzero", () => {
     const result = runCli(["embed"], "not-json")
 
@@ -221,6 +269,34 @@ describe("CLI process contract", () => {
     })
     expect(search.status).toBe(0)
     expect(JSON.parse(search.stdout)).toEqual({ ok: true, data: { results: [] } })
+  })
+
+  it("atomically upserts and lists retained channel avatars", () => {
+    const root = mkdtempSync(join(tmpdir(), "creative-agent-cli-"))
+    temporaryRoots.push(root)
+    const channel = preparedChannelInput(root, "creator")
+
+    const upsert = runCliAtRoot(
+      root,
+      ["channels", "upsert"],
+      JSON.stringify({ channels: [channel] }),
+    )
+    const list = runCliAtRoot(root, ["channels", "list"])
+
+    expect(upsert.status).toBe(0)
+    expect(JSON.parse(upsert.stdout)).toEqual({
+      ok: true,
+      data: { total: 1, inserted: 1, updated: 0 },
+    })
+    expect(list.status).toBe(0)
+    expect(JSON.parse(list.stdout).data.channels).toMatchObject([
+      {
+        id: "creator",
+        title: "Channel creator",
+        avatars: channel.avatars,
+        localAvatarPath: expect.stringMatching(/assets\/channel-avatars\/[a-f0-9]{64}\.jpg$/),
+      },
+    ])
   })
 
   it("rejects videos under 180 seconds and accepts the exact boundary", () => {
@@ -336,6 +412,9 @@ describe("command orchestration", () => {
       delete: () => unused,
       deleteMany: () => unused,
       replaceEmbeddings: () => unused,
+      upsertPreparedChannels: () => unused,
+      listChannels: unused,
+      showChannel: () => unused,
     }
     const layer = Layer.merge(
       Layer.succeed(VideoLibrary)(library),
@@ -381,6 +460,9 @@ describe("command orchestration", () => {
         replacements.push(batch)
         return Effect.void
       },
+      upsertPreparedChannels: () => unused,
+      listChannels: unused,
+      showChannel: () => unused,
     }
     const layer = Layer.merge(
       Layer.succeed(VideoLibrary)(library),

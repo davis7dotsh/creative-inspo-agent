@@ -8,6 +8,23 @@ export const ThumbnailVariant = Schema.Struct({
   height: Schema.optionalKey(Schema.Finite),
 })
 
+export const ChannelAvatarVariant = Schema.Struct({
+  url: Schema.String,
+  width: Schema.optionalKey(Schema.Finite),
+  height: Schema.optionalKey(Schema.Finite),
+})
+
+export const PreparedChannel = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  avatars: Schema.Array(ChannelAvatarVariant),
+  localAvatarPath: Schema.String,
+})
+
+export const PreparedChannelBatch = Schema.Struct({
+  channels: Schema.Array(PreparedChannel),
+})
+
 export const VideoStatistics = Schema.Struct({
   viewCount: Schema.String,
   commentCount: Schema.optionalKey(Schema.String),
@@ -36,6 +53,7 @@ export const PreparedVideo = Schema.Struct({
 
 export const PreparedVideoBatch = Schema.Struct({
   videos: Schema.Array(PreparedVideo),
+  channels: Schema.optionalKey(Schema.Array(PreparedChannel)),
 })
 
 export const VideoEmbeddingUpdate = Schema.Struct({
@@ -49,6 +67,9 @@ export const VideoEmbeddingUpdateBatch = Schema.Struct({
 })
 
 export type ThumbnailVariant = typeof ThumbnailVariant.Type
+export type ChannelAvatarVariant = typeof ChannelAvatarVariant.Type
+export type PreparedChannel = typeof PreparedChannel.Type
+export type PreparedChannelBatch = typeof PreparedChannelBatch.Type
 export type VideoStatistics = typeof VideoStatistics.Type
 export type Embedding = typeof Embedding.Type
 export type PreparedVideo = typeof PreparedVideo.Type

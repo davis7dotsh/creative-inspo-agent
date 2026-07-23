@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/@effect/tsgo/schema.json",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024"],
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "floatingEffect": "error",
+          "missingEffectContext": "error",
+          "missingEffectError": "error",
+          "outdatedApi": "warning"
+        }
+      }
+    ]
+  },
+  "include": ["src/server/**/*.ts", "src/contracts/**/*.ts", "test/**/*.ts"]
+}
